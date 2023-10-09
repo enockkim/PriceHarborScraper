@@ -1,9 +1,12 @@
 using FourtitudeIntegrated.DbContexts;
 using HtmlAgilityPack;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using Prema.PriceHarborScraper.AppSettings;
 using Prema.PriceHarborScraper.Models;
 using Prema.PriceHarborScraper.Policies;
 using Prema.PriceHarborScraper.Repository;
+using Prema.PriceHarborScraper.AppSettings;
 using PuppeteerSharp;
 using Serilog;
 
@@ -14,11 +17,13 @@ namespace Prema.PriceHarborScraper.Workers
         private readonly ILogger<JumiaScraper> _logger;
         private readonly IServiceProvider _serviceProvider;
         private readonly PollyPolicy _polly;
-        public JumiaScraper(ILogger<JumiaScraper> logger, IServiceProvider serviceProvider, PollyPolicy polly)
+        private readonly Settings _appSettings;
+        public JumiaScraper(ILogger<JumiaScraper> logger, IServiceProvider serviceProvider, PollyPolicy polly, IOptionsMonitor<Settings> appSettings)
         {
             _logger = logger;
             _serviceProvider = serviceProvider;
             _polly = polly;
+            _appSettings = appSettings.CurrentValue;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -37,23 +42,7 @@ namespace Prema.PriceHarborScraper.Workers
 
         public async Task Scraper()
         {
-            var proxyServers = new[]
-                {
-                    "154.79.254.236:32650",
-                    "197.248.86.237:32650",
-                    "197.232.47.122:8080",
-                    "197.254.84.86:32650",
-                    "102.0.3.222:8080",
-                    "154.79.248.44:32650",
-                    "197.254.11.250:32650",
-                    "196.216.65.57:8080",
-                    "80.240.202.218:8080",
-                    "197.232.36.85:41890",
-                    "102.0.2.104:8080",
-                    "197.254.99.58:8080",
-                    "154.79.251.210:32650",
-                    "197.232.65.40:55443"
-                };
+            var proxyServers = _appSettings.ProxyServers;
 
             var proxyServerArgument = string.Join(",", proxyServers);
             int proxyCount = 0;
@@ -107,8 +96,8 @@ namespace Prema.PriceHarborScraper.Workers
                     catch (Exception ex)
                     {
                         _logger.LogError($"Error: {ex.Message}");
-                        _logger.LogError($"Problem with proxy {proxyServers[proxyCount]}, trying new proxy {proxyServers[proxyCount == proxyServers.Length - 1 ? 0 : proxyCount + 1]}.");
-                        proxyCount = proxyCount == proxyServers.Length - 1 ? 0 : proxyCount + 1; 
+                        _logger.LogError($"Problem with proxy {proxyServers[proxyCount]}, trying new proxy {proxyServers[proxyCount == proxyServers.Count - 1 ? 0 : proxyCount + 1]}.");
+                        proxyCount = proxyCount == proxyServers.Count - 1 ? 0 : proxyCount + 1; 
                         continue;
                     }
 

@@ -7,6 +7,7 @@ using Prema.PriceHarborScraper.Repository;
 using Prema.PriceHarborScraper.Policies;
 using Serilog;
 using Serilog.Events;
+using Prema.PriceHarborScraper.AppSettings;
 
 public class Program
 {
@@ -50,6 +51,8 @@ public class Program
                 // Add MySQL DbContext
                 var connectionString = hostContext.Configuration.GetConnectionString("MySql");
                 services.AddDbContextPool<PriceHarborContext>(options => options.UseMySQL(connectionString));
+
+                services.Configure<Settings>(hostContext.Configuration.GetSection("AppSettings"));
 
                 //services.AddTransient<IRepository, Repository>();
                 services.AddSingleton<PollyPolicy>();
