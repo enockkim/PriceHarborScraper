@@ -1,9 +1,9 @@
-﻿using Prema.PriceHarborScraper.Models;
+﻿using Prema.PriceHarbor.Scraper.Models;
 using Microsoft.EntityFrameworkCore;
-using Prema.PriceHarborScraper.Models;
+using Prema.PriceHarbor.Scraper.Models;
 using System.Collections.Generic;
 
-namespace FourtitudeIntegrated.DbContexts
+namespace Prema.PriceHarbor.Scraper.DbContexts
 {
     public class PriceHarborContext : DbContext
     {

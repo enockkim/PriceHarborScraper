@@ -1,6 +1,6 @@
-﻿using FourtitudeIntegrated.DbContexts;
+﻿using Prema.PriceHarbor.Scraper.DbContexts;
 using Microsoft.EntityFrameworkCore;
-using Prema.PriceHarborScraper.Models;
+using Prema.PriceHarbor.Scraper.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -8,7 +8,7 @@ using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Prema.PriceHarborScraper.Repository
+namespace Prema.PriceHarbor.Scraper.Repository
 {
     public class Repository<T> : IRepository<T> where T : class
     {

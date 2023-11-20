@@ -1,16 +1,18 @@
-using FourtitudeIntegrated.DbContexts;
+using Prema.PriceHarbor.Scraper.DbContexts;
 using HtmlAgilityPack;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using Prema.PriceHarborScraper.AppSettings;
-using Prema.PriceHarborScraper.Models;
-using Prema.PriceHarborScraper.Policies;
-using Prema.PriceHarborScraper.Repository;
-using Prema.PriceHarborScraper.AppSettings;
+using Prema.PriceHarbor.Scraper.AppSettings;
+using Prema.PriceHarbor.Scraper.Models;
+using Prema.PriceHarbor.Scraper.Policies;
+using Prema.PriceHarbor.Scraper.Repository;
 using PuppeteerSharp;
 using Serilog;
+using MassTransit;
+using Prema.PriceHarbor.Contracts;
+using System.Text.RegularExpressions;
 
-namespace Prema.PriceHarborScraper.Workers
+namespace Prema.PriceHarbor.Scraper.Workers
 {
     public class JumiaScraper : BackgroundService
     {
@@ -18,12 +20,14 @@ namespace Prema.PriceHarborScraper.Workers
         private readonly IServiceProvider _serviceProvider;
         private readonly PollyPolicy _polly;
         private readonly Settings _appSettings;
-        public JumiaScraper(ILogger<JumiaScraper> logger, IServiceProvider serviceProvider, PollyPolicy polly, IOptionsMonitor<Settings> appSettings)
+        private readonly IBusControl _bus;
+        public JumiaScraper(ILogger<JumiaScraper> logger, IServiceProvider serviceProvider, PollyPolicy polly, IOptionsMonitor<Settings> appSettings, IBusControl bus)
         {
             _logger = logger;
             _serviceProvider = serviceProvider;
             _polly = polly;
             _appSettings = appSettings.CurrentValue;
+            _bus = bus;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -32,6 +36,7 @@ namespace Prema.PriceHarborScraper.Workers
             {
                 _logger.LogInformation("Jumia Web Sraper running at: {time}", DateTimeOffset.Now);
 
+                //run scraper
                 await Scraper();
 
                 _logger.LogInformation("Jumia Web Sraper complete at: {time}", DateTimeOffset.Now);
@@ -40,8 +45,10 @@ namespace Prema.PriceHarborScraper.Workers
             }
         }
 
-        public async Task Scraper()
+        public async Task<List<Product>> Scraper()
         {
+            List<Product> products = new List<Product>();
+
             var proxyServers = _appSettings.ProxyServers;
 
             var proxyServerArgument = string.Join(",", proxyServers);
@@ -67,7 +74,6 @@ namespace Prema.PriceHarborScraper.Workers
                 string baseUrl = "https://www.jumia.co.ke";
                 string categoryUrl = "/smartphones/";
                 string url = baseUrl + categoryUrl;
-                List<Product> products = new List<Product>();
                 bool validPage = true;
                 int pageCount = 1;
                 int deviceCount = 1;
@@ -120,21 +126,29 @@ namespace Prema.PriceHarborScraper.Workers
                     if (div != null)
                     {
                         var links = await div.QuerySelectorAllAsync("a");
-
+                        
                         _logger.LogInformation("Processing data.");
                         foreach (var link in links)
                         {
+                            //Get price
+                            var priceDiv = await link.QuerySelectorAllAsync("div.info div.prc");
+                            var priceRaw = await priceDiv[0].EvaluateFunctionAsync<string>("el => el.textContent");
+                            decimal price = Convert.ToDecimal(Regex.Replace(priceRaw, @"[^\d.]", ""));
+
+                            //Get link/name
                             var href = await link.EvaluateFunctionAsync<string>("el => el.getAttribute('href')");
-                            var product = new Product
+
+                            ProductData productData = new ProductData()
                             {
-                                Name = href,
+                                Name = href.TrimStart('/').TrimEnd('.', 'h', 't', 'm', 'l'),
                                 PlatformId = 1,
-                                ManufacturerId = 1,
                                 ProductGroupId = 1,
-                                Link = baseUrl + href
+                                Link = baseUrl + href,
+                                Price = price
                             };
-                            products.Add(product);
-                            Console.WriteLine(href);
+
+                            await PublishMessageAsync(productData);
+
                             deviceCount++;
                         }
                     }
@@ -150,14 +164,12 @@ namespace Prema.PriceHarborScraper.Workers
                 _logger.LogInformation($"Match manufacturers.");
                 GetManufacturer(products);
 
-                using (var scope = _serviceProvider.CreateScope())
-                {
-                    var scopedProductRepository = scope.ServiceProvider.GetRequiredService<IRepository<Product>>();
-                    scopedProductRepository.AddList(products);
-                }
                 _logger.LogInformation($"Total Items Found: {deviceCount}");
                 complete = true;
+
             }
+
+            return products;
         }
 
         public void GetManufacturer(List<Product> products)
@@ -177,6 +189,29 @@ namespace Prema.PriceHarborScraper.Workers
                         }
                     }
                 }
+            }
+        }
+
+        public async Task PublishMessagesAsync(List<Product> newProducts)
+        {
+            foreach(Product product in newProducts)
+            {
+                await _bus.Publish(new ProductData()
+                {
+                    Name = product.Name,
+                    PlatformId = product.PlatformId
+                });
+            }
+        }
+
+        public async Task PublishMessageAsync(ProductData newProduct)
+        {
+            try
+            {
+                await _bus.Publish(newProduct);
+            }catch(Exception ex)
+            {
+                _logger.LogError(ex.Message);
             }
         }
     }

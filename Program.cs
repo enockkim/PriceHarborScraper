@@ -1,13 +1,16 @@
-using FourtitudeIntegrated.DbContexts;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.EntityFrameworkCore;
-using Prema.PriceHarborScraper.Workers;
-using Prema.PriceHarborScraper.Repository;
-using Prema.PriceHarborScraper.Policies;
+using Prema.PriceHarbor.Scraper.Workers;
+using Prema.PriceHarbor.Scraper.Repository;
+using Prema.PriceHarbor.Scraper.Policies;
 using Serilog;
 using Serilog.Events;
-using Prema.PriceHarborScraper.AppSettings;
+using Prema.PriceHarbor.Scraper.AppSettings;
+using MassTransit;
+using System.Configuration;
+using Prema.PriceHarbor.Scraper.DbContexts;
+using Prema.PriceHarbor.Contracts;
 
 public class Program
 {
@@ -18,6 +21,7 @@ public class Program
             .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
             .Enrich.FromLogContext()
             .WriteTo.Console()
+            .WriteTo.File("logs/Scrapper.log", rollingInterval: RollingInterval.Day)            
             .CreateLogger();    
 
         try
@@ -44,7 +48,7 @@ public class Program
             {
                 configBuilder
                     .SetBasePath(Directory.GetCurrentDirectory())
-                    .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true);
+                    .AddJsonFile("appsettings.Development.json", optional: true, reloadOnChange: true);
             })
             .ConfigureServices((hostContext, services) =>
             {
@@ -53,6 +57,30 @@ public class Program
                 services.AddDbContextPool<PriceHarborContext>(options => options.UseMySQL(connectionString));
 
                 services.Configure<Settings>(hostContext.Configuration.GetSection("AppSettings"));
+                var rabbitMqOptions = hostContext.Configuration.GetSection("AppSettings:RabbitMqOptions").Get<RabbitMqOptions>();
+
+                services.AddMassTransit(x =>
+                {
+                    x.UsingRabbitMq((context, cfg) =>
+                    {
+                        cfg.Host(rabbitMqOptions.HostName, rabbitMqOptions.Port, rabbitMqOptions.VHost, h =>
+                        {
+                            h.Username(rabbitMqOptions.UserName);
+                            h.Password(rabbitMqOptions.Password);
+                        });
+
+                        cfg.ReceiveEndpoint("new-product-data-found", e => 
+                        {
+                            e.Bind<ProductData>();
+                        });
+
+                        cfg.Publish<ProductData>(x =>
+                        {
+                            x.Durable = true;
+                        });
+
+                    });
+                });
 
                 //services.AddTransient<IRepository, Repository>();
                 services.AddSingleton<PollyPolicy>();

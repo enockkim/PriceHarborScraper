@@ -1,6 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-namespace Prema.PriceHarborScraper.Models
+namespace Prema.PriceHarbor.Scraper.Models
 {
     public class Manufacturer
     {

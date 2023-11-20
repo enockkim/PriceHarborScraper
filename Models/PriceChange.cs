@@ -6,7 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Prema.PriceHarborScraper.Models
+namespace Prema.PriceHarbor.Scraper.Models
 {
 
     public class PriceChange
@@ -25,5 +25,8 @@ namespace Prema.PriceHarborScraper.Models
 
         [ForeignKey("ProductId")]
         public Product Product { get; set; }
+
+        [Required]
+        public int ChangeDirection { get; set; } //0 decrease 1 increase
     }
 }

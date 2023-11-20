@@ -11,10 +11,10 @@ using Microsoft.Extensions.Configuration;
 using Polly;
 using Polly.CircuitBreaker;
 using Polly.Retry;
-using Prema.PriceHarborScraper.Workers;
+using Prema.PriceHarbor.Scraper.Workers;
 using PuppeteerSharp;
 
-namespace Prema.PriceHarborScraper.Policies
+namespace Prema.PriceHarbor.Scraper.Policies
 {
     public class PollyPolicy
     {

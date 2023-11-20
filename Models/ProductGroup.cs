@@ -6,7 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Prema.PriceHarborScraper.Models
+namespace Prema.PriceHarbor.Scraper.Models
 {
     public class ProductGroup
     {

@@ -4,7 +4,7 @@ using MySql.EntityFrameworkCore.Metadata;
 
 #nullable disable
 
-namespace Prema.PriceHarborScraper.Migrations
+namespace Prema.PriceHarbor.Scraper.Migrations
 {
     /// <inheritdoc />
     public partial class addedParent : Migration
